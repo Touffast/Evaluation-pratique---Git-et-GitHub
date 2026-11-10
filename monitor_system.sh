@@ -15,5 +15,6 @@ echo -e "\n[2] Utilisation de la Memoire (RAM) :"
 free -h
 
 echo -e "\n[3] Utilisation des Disques :"
-# ANOMALIE VOLONTAIRE POUR SECTION 8 : affichage brut en blocs illisibles sans -h et mal aligné
+df -h /
+
 df / | tr -s ' ' ';'
