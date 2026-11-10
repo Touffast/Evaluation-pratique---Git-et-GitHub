@@ -38,6 +38,9 @@ lister_comptes() {
     awk -F: '{ printf "  %-20s %-7s %-7s %-25s %s\n", $1, $3, $4, $6, $7 }' /etc/passwd
 }
 
+groupes_admin
+controle_uid0
+
 # ===== Programme principal =====
 case "${1:-}" in
     -h|--help) usage; exit 0 ;;
@@ -47,3 +50,30 @@ esac
 
 echo "Audit local de $(hostname) — $(date '+%d/%m/%Y %H:%M:%S')"
 lister_comptes
+
+groupes_admin() {
+    titre "Membres des groupes d'administration"
+    local g membres trouve=0
+    for g in sudo wheel admin; do
+        if getent group "$g" >/dev/null; then
+            membres=$(getent group "$g" | cut -d: -f4)
+            echo "  $g : ${membres:-(aucun membre)}"
+            trouve=1
+        fi
+    done
+    if [ "$trouve" -eq 0 ]; then
+        echo "  Aucun groupe sudo, wheel ou admin sur ce système."
+    fi
+}
+
+controle_uid0() {
+    titre "Contrôle : comptes à UID 0"
+    local suspects
+    suspects=$(awk -F: '$3 == 0 && $1 != "root" { print $1 }' /etc/passwd)
+    if [ -n "$suspects" ]; then
+        echo "  [ALERTE] Comptes à UID 0 autres que root :"
+        echo "$suspects" | sed 's/^/    - /'
+    else
+        echo "  [OK] Seul root possède l'UID 0."
+    fi
+}
