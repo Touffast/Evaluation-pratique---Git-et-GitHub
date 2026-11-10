@@ -38,8 +38,50 @@ lister_comptes() {
     awk -F: '{ printf "  %-20s %-7s %-7s %-25s %s\n", $1, $3, $4, $6, $7 }' /etc/passwd
 }
 
-groupes_admin
-controle_uid0
+# Comptes humains : UID entre UID_MIN (/etc/login.defs, 1000 par défaut) et 65533
+comptes_humains() {
+    local min
+    min=$(awk '/^UID_MIN/ { print $2 }' /etc/login.defs 2>/dev/null)
+    awk -F: -v min="${min:-1000}" '$3 >= min && $3 < 65534 { print $1 }' /etc/passwd
+}
+
+derniere_connexion() {
+    titre "Dernière connexion des comptes humains"
+    local u info liste
+    liste=$(comptes_humains)
+    if [ -z "$liste" ]; then
+        echo "  Aucun compte humain."
+        return
+    fi
+    for u in $liste; do
+        info=""
+        if command -v lastlog >/dev/null 2>&1; then
+            info=$(lastlog -u "$u" 2>/dev/null | awk 'NR == 2 { $1 = ""; sub(/^ +/, ""); print }')
+        elif command -v last >/dev/null 2>&1; then
+            info=$(last -n 1 "$u" 2>/dev/null | head -n 1)
+        fi
+        printf "  - %-20s %s\n" "$u" "${info:-inconnue}"
+    done
+}
+
+utilisateurs_connectes() {
+    titre "Utilisateurs actuellement connectés"
+    local sessions
+    sessions=$(who 2>/dev/null)
+    if [ -n "$sessions" ]; then
+        echo "$sessions" | sed 's/^/  /'
+    else
+        echo "  Aucune session ouverte."
+    fi
+}
+
+resume() {
+    titre "Résumé"
+    echo "  Comptes au total         : $(wc -l < /etc/passwd)"
+    echo "  Comptes humains          : $(comptes_humains | wc -l)"
+    echo "  UID 0 autres que root    : $(awk -F: '$3 == 0 && $1 != "root"' /etc/passwd | wc -l)"
+    echo "  Sessions ouvertes        : $(who 2>/dev/null | wc -l)"
+}
 
 # ===== Programme principal =====
 case "${1:-}" in
@@ -77,3 +119,7 @@ controle_uid0() {
         echo "  [OK] Seul root possède l'UID 0."
     fi
 }
+
+derniere_connexion
+utilisateurs_connectes
+resume
